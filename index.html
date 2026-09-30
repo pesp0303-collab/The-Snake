@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+<title>لعبة الأفعى والكرة - نيون</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    background:#05010f;color:#e9e9ff;
+    font-family:"Segoe UI",Tahoma,"Noto Kufi Arabic",system-ui,sans-serif;
+    min-height:100vh;overflow-x:hidden;position:relative;
+  }
+  /* ===== خلفية متحركة ===== */
+  .blobs{position:fixed;inset:0;pointer-events:none;overflow:hidden}
+  .blob{position:absolute;width:380px;height:380px;border-radius:50%;filter:blur(70px)}
+  .b1{top:-80px;right:-80px;background:rgba(192,38,211,.3);animation:blobMove 9s ease-in-out infinite}
+  .b2{top:35%;left:-100px;background:rgba(6,182,212,.25);animation:blobMove 11s ease-in-out infinite reverse}
+  .b3{bottom:-100px;right:25%;background:rgba(124,58,237,.3);animation:blobMove 13s ease-in-out infinite}
+  @keyframes blobMove{
+    0%,100%{transform:translate(0,0) scale(1)}
+    50%{transform:translate(60px,-40px) scale(1.25)}
+  }
+  .wrap{
+    position:relative;z-index:1;max-width:620px;margin:0 auto;
+    padding:20px 12px;display:flex;flex-direction:column;align-items:center;gap:16px;
+  }
+  /* ===== العنوان ===== */
+  h1{
+    font-size:clamp(28px,7vw,48px);font-weight:900;color:#fff;text-align:center;
+    display:flex;align-items:center;gap:12px;letter-spacing:1px;
+    animation:flicker 4s infinite;
+  }
+  h1 span{display:inline-block;animation:floaty 2.2s ease-in-out infinite}
+  h1 span:last-child{animation-delay:.6s}
+  @keyframes flicker{
+    0%,18%,22%,25%,53%,57%,100%{
+      text-shadow:0 0 6px #fff,0 0 14px #0ff,0 0 28px #0ff,0 0 48px #0ff,0 0 80px #0ff;opacity:1}
+    20%,24%,55%{text-shadow:none;opacity:.75}
+  }
+  @keyframes floaty{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+  /* ===== لوحة النتائج ===== */
+  .hud{width:100%;display:grid;grid-template-columns:repeat(3,1fr);gap:12px;text-align:center}
+  .stat{
+    border:1px solid var(--c);border-radius:12px;padding:8px 4px;
+    background:rgba(255,255,255,.03);
+    box-shadow:0 0 12px color-mix(in srgb,var(--c) 55%,transparent),inset 0 0 12px color-mix(in srgb,var(--c) 15%,transparent);
+  }
+  .stat small{display:block;font-size:13px;color:var(--c);opacity:.85}
+  .stat b{
+    display:inline-block;font-size:clamp(24px,6vw,32px);font-weight:900;color:#fff;
+    text-shadow:0 0 10px var(--c),0 0 22px var(--c);
+  }
+  .pop{animation:pop .35s ease-out}
+  @keyframes pop{0%{transform:scale(1)}40%{transform:scale(1.5);color:#ff2bd6}100%{transform:scale(1)}}
+  /* شريط الكرة الذهبية */
+  .bonusbar{width:100%;height:8px;border-radius:99px;background:rgba(255,255,255,.06);overflow:hidden;opacity:.25;transition:opacity .3s}
+  .bonusbar.on{opacity:1}
+  .bonusbar div{
+    height:100%;width:0;border-radius:99px;transition:width .12s linear;
+    background:linear-gradient(90deg,#ffe600,#ff2bd6);box-shadow:0 0 12px #ffe600;
+  }
+  /* ===== اللوحة ===== */
+  .board{
+    position:relative;width:100%;aspect-ratio:1/1;border-radius:18px;overflow:hidden;
+    border:2px solid rgba(103,232,249,.85);touch-action:none;
+    animation:pulseGlow 3s ease-in-out infinite;
+  }
+  @keyframes pulseGlow{
+    0%,100%{box-shadow:0 0 10px #0ff,0 0 24px #0ff6,inset 0 0 10px #0ff4}
+    50%{box-shadow:0 0 18px #f0f,0 0 44px #f0f8,inset 0 0 18px #f0f4}
+  }
+  canvas{width:100%;height:100%;display:block}
+  .overlay{
+    position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    gap:16px;text-align:center;padding:16px;background:rgba(5,1,15,.72);backdrop-filter:blur(2px);
+    animation:overlayIn .35s ease-out;
+  }
+  .overlay.hidden{display:none}
+  @keyframes overlayIn{from{opacity:0;transform:scale(.85)}to{opacity:1;transform:scale(1)}}
+  .ov-title{font-size:clamp(24px,6vw,34px);font-weight:900}
+  .ov-text{font-size:clamp(14px,3.5vw,16px);line-height:1.9;color:rgba(251,207,232,.9)}
+  /* ===== أزرار النيون ===== */
+  .neon-btn{
+    color:var(--c,#0ff);font-family:inherit;
+    border:2px solid currentColor;border-radius:14px;background:rgba(255,255,255,.03);
+    text-shadow:0 0 8px currentColor;
+    box-shadow:0 0 10px currentColor,inset 0 0 10px rgba(255,255,255,.08);
+    transition:transform .15s,background .15s,box-shadow .15s;
+    cursor:pointer;user-select:none;-webkit-tap-highlight-color:transparent;
+  }
+  .neon-btn:hover{background:rgba(255,255,255,.12);box-shadow:0 0 20px currentColor,0 0 40px currentColor;transform:translateY(-2px)}
+  .neon-btn:active{transform:scale(.92)}
+  .play-btn{padding:12px 32px;font-size:20px;font-weight:700;animation:hue 8s linear infinite}
+  @keyframes hue{from{filter:hue-rotate(0)}to{filter:hue-rotate(360deg)}}
+  .dpad{display:grid;grid-template-columns:repeat(3,64px);grid-template-rows:repeat(3,64px);gap:8px;direction:ltr;user-select:none}
+  .dpad button{font-size:24px;font-weight:700;display:flex;align-items:center;justify-content:center}
+  @media (max-width:480px){.dpad{grid-template-columns:repeat(3,56px);grid-template-rows:repeat(3,56px)}}
+  .hint{font-size:13px;color:rgba(255,255,255,.5);text-align:center;line-height:1.8}
+</style>
+</head>
+<body>
+<div class="blobs"><div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div></div>
+<div class="wrap">
+  <h1><span>🐍</span>الأفعى والكرة<span>🔮</span></h1>
+  <div class="hud">
+    <div class="stat" style="--c:#00f0ff"><small>النقاط</small><b id="score">0</b></div>
+    <div class="stat" style="--c:#ff2bd6"><small>المستوى</small><b id="level">1</b></div>
+    <div class="stat" style="--c:#ffe600"><small>أفضل نتيجة</small><b id="best">0</b></div>
+  </div>
+  <div class="bonusbar" id="bonusbar"><div id="bonusfill"></div></div>
+  <div class="board" id="board">
+    <canvas id="game" width="600" height="600"></canvas>
+    <div class="overlay" id="overlay">
+      <div class="ov-title" id="ovTitle"></div>
+      <div class="ov-text" id="ovText"></div>
+      <button class="neon-btn play-btn" id="playBtn" style="--c:#00f0ff"></button>
+    </div>
+  </div>
+  <div class="dpad">
+    <span></span>
+    <button class="neon-btn" data-dir="up" style="--c:#00f0ff">▲</button>
+    <span></span>
+    <button class="neon-btn" data-dir="left" style="--c:#ff2bd6">◀</button>
+    <button class="neon-btn" id="pauseBtn" style="--c:#ffe600">▶</button>
+    <button class="neon-btn" data-dir="right" style="--c:#b026ff">▶</button>
+    <span></span>
+    <button class="neon-btn" data-dir="down" style="--c:#39ff14">▼</button>
+    <span></span>
+  </div>
+  <p class="hint"><h2> مطور اللعبة محمد صلاح </h2></p>
+</div>
+<script>
+(function () {
+  "use strict";
+  // ================== الإعدادات ==================
+  var GRID = 20, CELL = 30, SIZE = GRID * CELL, BONUS_TIME = 6000;
+  var DIRS = {
+    up: { x: 0, y: -1 }, down: { x: 0, y: 1 },
+    left: { x: -1, y: 0 }, right: { x: 1, y: 0 }
+  };
+  var canvas = document.getElementById("game");
+  var ctx = canvas.getContext("2d");
+  var elScore = document.getElementById("score");
+  var elLevel = document.getElementById("level");
+  var elBest = document.getElementById("best");
+  var elBar = document.getElementById("bonusbar");
+  var elFill = document.getElementById("bonusfill");
+  var overlay = document.getElementById("overlay");
+  var ovTitle = document.getElementById("ovTitle");
+  var ovText = document.getElementById("ovText");
+  var playBtn = document.getElementById("playBtn");
+  var pauseBtn = document.getElementById("pauseBtn");
+  // ================== الحالة ==================
+  var snake, prev, dir, queue, food, bonus, particles;
+  var acc = 0, shake = 0, eaten = 0, score = 0, level = 1;
+  var status = "ready"; // ready | playing | paused | over
+  var best = 0;
+  try { best = Number(localStorage.getItem("neon-snake-best") || 0); } catch (e) {}
+  elBest.textContent = best;
+  function clone(a) { return a.map(function (s) { return { x: s.x, y: s.y }; }); }
+  function randomFreeCell() {
+    while (true) {
+      var p = { x: Math.floor(Math.random() * GRID), y: Math.floor(Math.random() * GRID) };
+      var busy = snake.some(function (s) { return s.x === p.x && s.y === p.y; }) ||
+        (food && food.x === p.x && food.y === p.y) ||
+        (bonus && bonus.x === p.x && bonus.y === p.y);
+      if (!busy) return p;
+    }
+  }
+  function reset() {
+    snake = [{ x: 6, y: 10 }, { x: 5, y: 10 }, { x: 4, y: 10 }];
+    prev = clone(snake);
+    dir = DIRS.right; queue = [];
+    bonus = null; particles = []; food = null;
+    acc = 0; eaten = 0; score = 0; level = 1;
+    elScore.textContent = 0; elLevel.textContent = 1;
+    setBonusUI(0);
+    food = randomFreeCell();
+  }
+  function setBonusUI(k) {
+    elFill.style.width = (k * 100) + "%";
+    elBar.classList.toggle("on", k > 0);
+  }
+  function burst(p, hue, n) {
+    n = n || 26;
+    for (var i = 0; i < n; i++) {
+      var a = Math.random() * Math.PI * 2, sp = 0.6 + Math.random() * 3.2;
+      particles.push({
+        x: (p.x + 0.5) * CELL, y: (p.y + 0.5) * CELL,
+        vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
+        life: 0, max: 500 + Math.random() * 500,
+        hue: hue + Math.random() * 40 - 20, r: 1.5 + Math.random() * 3
+      });
+    }
+  }
+  // ================== الواجهة ==================
+  function showOverlay() {
+    overlay.classList.remove("hidden");
+    // إعادة تشغيل الانميشن
+    overlay.style.animation = "none"; void overlay.offsetWidth; overlay.style.animation = "";
+    if (status === "ready") {
+      ovTitle.style.cssText = "color:#67e8f9;text-shadow:0 0 14px #0ff";
+      ovTitle.textContent = "جاهز للعب؟";
+      ovText.innerHTML = "كُل الكرات المتوهجة لتكبر أفعاك 🔮<br>الكرة الذهبية ⭐ تعطيك 5 نقاط!";
+      playBtn.textContent = "ابدأ اللعب";
+    } else if (status === "paused") {
+      ovTitle.style.cssText = "color:#fde047;text-shadow:0 0 14px #ffe600";
+      ovTitle.textContent = "⏸ متوقفة مؤقتاً";
+      ovText.textContent = "";
+      playBtn.textContent = "استمرار";
+    } else if (status === "over") {
+      ovTitle.style.cssText = "font-size:clamp(28px,8vw,40px);color:#fb7185;text-shadow:0 0 10px #f43f5e,0 0 30px #f43f5e";
+      ovTitle.textContent = "انتهت اللعبة!";
+      ovText.innerHTML = "نتيجتك: <b style='color:#fff'>" + score + "</b>" +
+        (score > 0 && score >= best ? " <span style='color:#fde047'>🏆 رقم قياسي!</span>" : "");
+      playBtn.textContent = "العب مرة أخرى";
+    }
+  }
+  function setStatus(s) {
+    status = s;
+    pauseBtn.textContent = s === "playing" ? "⏸" : "▶";
+    if (s === "playing") overlay.classList.add("hidden"); else showOverlay();
+  }
+  function start() {
+    if (status === "ready" || status === "over") reset();
+    setStatus("playing");
+  }
+  function togglePause() {
+    if (status === "playing") setStatus("paused");
+    else if (status === "paused") setStatus("playing");
+  }
+  function turn(name) {
+    var d = DIRS[name];
+    if (status === "ready" || status === "over") start();
+    if (status === "paused") return;
+    var last = queue.length ? queue[queue.length - 1] : dir;
+    if (d.x === -last.x && d.y === -last.y) return;
+    if (d.x === last.x && d.y === last.y) return;
+    if (queue.length < 3) queue.push(d);
+  }
+  function gain(pts) {
+    score += pts;
+    elScore.textContent = score;
+    elScore.classList.remove("pop"); void elScore.offsetWidth; elScore.classList.add("pop");
+  }
+  function die() {
+    shake = 450;
+    snake.forEach(function (s, i) { if (i % 2 === 0) burst(s, 300 + i * 6, 6); });
+    if (score > best) {
+      best = score; elBest.textContent = best;
+      try { localStorage.setItem("neon-snake-best", String(best)); } catch (e) {}
+    }
+    setStatus("over");
+  }
+  // ================== منطق اللعبة ==================
+  function tickMs() { return Math.max(65, 145 - (level - 1) * 9); }
+  function step() {
+    if (queue.length) dir = queue.shift();
+    var head = { x: snake[0].x + dir.x, y: snake[0].y + dir.y };
+    if (head.x < 0 || head.y < 0 || head.x >= GRID || head.y >= GRID) {
+      prev = clone(snake); return die();
+    }
+    var ateFood = head.x === food.x && head.y === food.y;
+    var ateBonus = !!bonus && head.x === bonus.x && head.y === bonus.y;
+    var body = (ateFood || ateBonus) ? snake : snake.slice(0, -1);
+    if (body.some(function (s) { return s.x === head.x && s.y === head.y; })) {
+      prev = clone(snake); return die();
+    }
+    prev = clone(snake);
+    snake.unshift(head);
+    if (!ateFood && !ateBonus) snake.pop();
+    if (ateFood) {
+      burst(head, 320); gain(1); eaten++;
+      food = randomFreeCell();
+      if (eaten % 4 === 0) { level++; elLevel.textContent = level; }
+      if (eaten % 5 === 0 && !bonus) {
+        var p = randomFreeCell();
+        bonus = { x: p.x, y: p.y, left: BONUS_TIME };
+      }
+    } else if (ateBonus) {
+      burst(head, 50, 40); gain(5); bonus = null; setBonusUI(0);
+    }
+  }
+  // ================== الرسم ==================
+  function glowCircle(x, y, r, color, blur) {
+    ctx.save();
+    ctx.shadowColor = color; ctx.shadowBlur = blur; ctx.fillStyle = color;
+    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
+  function drawBall(p, t, hue, big) {
+    var cx = (p.x + 0.5) * CELL;
+    var bounce = Math.abs(Math.sin(t / 260));
+    var cy = (p.y + 0.5) * CELL - bounce * 6;
+    var R = big * (1 + Math.sin(t / 180) * 0.08);
+    var col = "hsl(" + hue + ",100%,60%)";
+    // ظل
+    ctx.save();
+    ctx.fillStyle = "hsla(" + hue + ",100%,60%," + (0.35 - bounce * 0.2) + ")";
+    ctx.beginPath();
+    ctx.ellipse(cx, (p.y + 0.5) * CELL + 11, R * (0.9 - bounce * 0.25), 3.5, 0, 0, Math.PI * 2);
+    ctx.fill(); ctx.restore();
+    // حلقة دوارة
+    ctx.save();
+    ctx.strokeStyle = "hsla(" + hue + ",100%,70%,.6)";
+    ctx.lineWidth = 1.5; ctx.shadowColor = col; ctx.shadowBlur = 10;
+    ctx.setLineDash([4, 6]); ctx.lineDashOffset = -t / 40;
+    ctx.beginPath(); ctx.arc(cx, cy, R + 6 + Math.sin(t / 200) * 2, 0, Math.PI * 2); ctx.stroke();
+    ctx.restore();
+    // الكرة
+    ctx.save();
+    var g = ctx.createRadialGradient(cx - R * 0.35, cy - R * 0.35, 1, cx, cy, R);
+    g.addColorStop(0, "#ffffff");
+    g.addColorStop(0.35, "hsl(" + hue + ",100%,70%)");
+    g.addColorStop(1, "hsl(" + hue + ",100%,45%)");
+    ctx.shadowColor = col; ctx.shadowBlur = 28; ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
+  function draw(t, progress) {
+    ctx.save();
+    ctx.clearRect(0, 0, SIZE, SIZE);
+    if (shake > 0) {
+      var m = shake / 45;
+      ctx.translate((Math.random() - 0.5) * m, (Math.random() - 0.5) * m);
+    }
+    // الخلفية
+    var bg = ctx.createRadialGradient(SIZE / 2, SIZE / 2, 40, SIZE / 2, SIZE / 2, SIZE * 0.75);
+    bg.addColorStop(0, "#14062e"); bg.addColorStop(1, "#05010f");
+    ctx.fillStyle = bg; ctx.fillRect(0, 0, SIZE, SIZE);
+    // الشبكة
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = "hsla(" + ((t / 50) % 360) + ",100%,60%,.10)";
+    ctx.beginPath();
+    for (var i = 0; i <= GRID; i++) {
+      ctx.moveTo(i * CELL + 0.5, 0); ctx.lineTo(i * CELL + 0.5, SIZE);
+      ctx.moveTo(0, i * CELL + 0.5); ctx.lineTo(SIZE, i * CELL + 0.5);
+    }
+    ctx.stroke();
+    // خط المسح
+    var sy = ((t / 14) % (SIZE + 120)) - 60;
+    var sg = ctx.createLinearGradient(0, sy - 60, 0, sy + 60);
+    sg.addColorStop(0, "rgba(0,255,255,0)");
+    sg.addColorStop(0.5, "rgba(0,255,255,.07)");
+    sg.addColorStop(1, "rgba(0,255,255,0)");
+    ctx.fillStyle = sg; ctx.fillRect(0, sy - 60, SIZE, 120);
+    // الكرات
+    drawBall(food, t, 320, 10);
+    if (bonus) {
+      var k = bonus.left / BONUS_TIME;
+      drawBall(bonus, t + 300, 50, 12);
+      var bx = (bonus.x + 0.5) * CELL, by = (bonus.y + 0.5) * CELL;
+      ctx.save();
+      ctx.strokeStyle = "#ffe600"; ctx.shadowColor = "#ffe600"; ctx.shadowBlur = 12; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(bx, by, 20, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * k); ctx.stroke();
+      ctx.restore();
+    }
+    // الأفعى
+    var pts = snake.map(function (c, i) {
+      var p = prev[i] || c;
+      return {
+        x: (p.x + (c.x - p.x) * progress + 0.5) * CELL,
+        y: (p.y + (c.y - p.y) * progress + 0.5) * CELL
+      };
+    });
+    var n = pts.length, baseHue = (t / 12) % 360;
+    for (var j = n - 1; j >= 0; j--) {
+      var f = 1 - j / Math.max(n, 1);
+      var hue = (baseHue + j * 9) % 360;
+      var r = 6 + f * 6 + (j === 0 ? 2 : 0);
+      var color = "hsl(" + hue + ",100%,60%)";
+      if (j < n - 1) {
+        var a = pts[j], b = pts[j + 1];
+        ctx.save();
+        ctx.strokeStyle = color; ctx.shadowColor = color; ctx.shadowBlur = 16;
+        ctx.lineWidth = r * 1.8; ctx.lineCap = "round";
+        ctx.beginPath(); ctx.moveTo(b.x, b.y); ctx.lineTo(a.x, a.y); ctx.stroke();
+        ctx.restore();
+      }
+      glowCircle(pts[j].x, pts[j].y, r, color, 18);
+      ctx.fillStyle = "rgba(255,255,255,.35)";
+      ctx.beginPath(); ctx.arc(pts[j].x - r * 0.25, pts[j].y - r * 0.3, r * 0.4, 0, Math.PI * 2); ctx.fill();
+    }
+    // الرأس والعينان
+    if (n) {
+      var h = pts[0];
+      var dd = (status === "playing" || status === "paused") ? (queue[0] || dir) : dir;
+      var px = -dd.y, py = dd.x;
+      [-1, 1].forEach(function (side) {
+        var ex = h.x + dd.x * 4 + px * side * 5;
+        var ey = h.y + dd.y * 4 + py * side * 5;
+        ctx.fillStyle = "#fff"; ctx.shadowColor = "#fff"; ctx.shadowBlur = 8;
+        ctx.beginPath(); ctx.arc(ex, ey, 3.6, 0, Math.PI * 2); ctx.fill();
+        ctx.shadowBlur = 0; ctx.fillStyle = "#12002b";
+        ctx.beginPath(); ctx.arc(ex + dd.x * 1.3, ey + dd.y * 1.3, 1.8, 0, Math.PI * 2); ctx.fill();
+      });
+      // اللسان
+      if (status === "playing" && Math.sin(t / 120) > 0.2) {
+        ctx.strokeStyle = "#ff2b4f"; ctx.shadowColor = "#ff2b4f"; ctx.shadowBlur = 8; ctx.lineWidth = 2;
+        var tx = h.x + dd.x * 12, ty = h.y + dd.y * 12;
+        ctx.beginPath();
+        ctx.moveTo(h.x + dd.x * 9, h.y + dd.y * 9);
+        ctx.lineTo(tx + dd.x * 6, ty + dd.y * 6);
+        ctx.moveTo(tx + dd.x * 6, ty + dd.y * 6);
+        ctx.lineTo(tx + dd.x * 11 + px * 4, ty + dd.y * 11 + py * 4);
+        ctx.moveTo(tx + dd.x * 6, ty + dd.y * 6);
+        ctx.lineTo(tx + dd.x * 11 - px * 4, ty + dd.y * 11 - py * 4);
+        ctx.stroke(); ctx.shadowBlur = 0;
+      }
+    }
+    // الجسيمات
+    particles.forEach(function (p) {
+      var kk = 1 - p.life / p.max;
+      ctx.fillStyle = "hsla(" + p.hue + ",100%,65%," + kk + ")";
+      ctx.shadowColor = "hsl(" + p.hue + ",100%,60%)"; ctx.shadowBlur = 10;
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.r * kk + 0.5, 0, Math.PI * 2); ctx.fill();
+    });
+    ctx.shadowBlur = 0;
+    ctx.restore();
+  }
+  // ================== الحلقة الرئيسية ==================
+  var last = performance.now(), lastBonusUi = 0;
+  function frame(t) {
+    var dt = Math.min(t - last, 100);
+    last = t;
+    if (status === "playing") {
+      acc += dt;
+      var guard = 0;
+      while (acc >= tickMs() && status === "playing" && guard++ < 4) {
+        acc -= tickMs();
+        step();
+      }
+      if (bonus) {
+        bonus.left -= dt;
+        if (bonus.left <= 0) { bonus = null; setBonusUI(0); }
+        else if (t - lastBonusUi > 120) { lastBonusUi = t; setBonusUI(bonus.left / BONUS_TIME); }
+      }
+    }
+    particles.forEach(function (p) {
+      p.life += dt;
+      p.x += p.vx * (dt / 16); p.y += p.vy * (dt / 16);
+      p.vx *= 0.97; p.vy *= 0.97;
+    });
+    particles = particles.filter(function (p) { return p.life < p.max; });
+    if (shake > 0) shake = Math.max(0, shake - dt);
+    var progress = (status === "playing" || status === "paused") ? Math.min(acc / tickMs(), 1) : 1;
+    draw(t, progress);
+    requestAnimationFrame(frame);
+  }
+  // ================== التحكم ==================
+  var keyMap = {
+    ArrowUp: "up", w: "up", W: "up",
+    ArrowDown: "down", s: "down", S: "down",
+    ArrowLeft: "left", a: "left", A: "left",
+    ArrowRight: "right", d: "right", D: "right"
+  };
+  window.addEventListener("keydown", function (e) {
+    if (keyMap[e.key]) { e.preventDefault(); turn(keyMap[e.key]); }
+    else if (e.key === " " || e.key === "p" || e.key === "P") {
+      e.preventDefault();
+      if (status === "playing" || status === "paused") togglePause(); else start();
+    } else if (e.key === "Enter") { if (status !== "playing") start(); }
+  });
+  document.querySelectorAll("[data-dir]").forEach(function (b) {
+    b.addEventListener("pointerdown", function (e) { e.preventDefault(); turn(b.getAttribute("data-dir")); });
+  });
+  pauseBtn.addEventListener("click", function () {
+    if (status === "playing" || status === "paused") togglePause(); else start();
+  });
+  playBtn.addEventListener("click", function () {
+    if (status === "paused") togglePause(); else start();
+  });
+  // السحب بالإصبع
+  var touch = null, board = document.getElementById("board");
+  board.addEventListener("touchstart", function (e) {
+    touch = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+  }, { passive: true });
+  board.addEventListener("touchend", function (e) {
+    if (!touch) return;
+    var dx = e.changedTouches[0].clientX - touch.x;
+    var dy = e.changedTouches[0].clientY - touch.y;
+    touch = null;
+    if (Math.max(Math.abs(dx), Math.abs(dy)) < 20) return;
+    if (Math.abs(dx) > Math.abs(dy)) turn(dx > 0 ? "right" : "left");
+    else turn(dy > 0 ? "down" : "up");
+  });
+  // ================== البدء ==================
+  reset();
+  setStatus("ready");
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
